@@ -1,0 +1,13 @@
+node_modules/
+dist/
+# Generated output (project-specific)
+my-project/
+.env
+.env.*
+*.key
+*.pem
+/tmp/saasdesign/
+.DS_Store
+*.js.map
+*.d.ts.map
+.claude/
