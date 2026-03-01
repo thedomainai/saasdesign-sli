@@ -51,12 +51,12 @@ export async function generateDesignSystem(input: DesignSystemInput): Promise<st
     }
   }
 
-  const existingContext =
-    input.existingDS.designSystemMd
-      ? `\n## 既存デザインシステム（参照・統合する）\n\n${input.existingDS.designSystemMd.slice(0, 3000)}`
-      : input.existingDS.cssVariables
-      ? `\n## 既存 CSS 変数\n\n${input.existingDS.cssVariables.slice(0, 2000)}`
-      : '';
+  let existingContext = '';
+  if (input.existingDS.designSystemMd) {
+    existingContext = `\n## 既存デザインシステム（参照・統合する）\n\n${input.existingDS.designSystemMd.slice(0, 3000)}`;
+  } else if (input.existingDS.cssVariables) {
+    existingContext = `\n## 既存 CSS 変数\n\n${input.existingDS.cssVariables.slice(0, 2000)}`;
+  }
 
   const selectedDesignsList = input.context.selectedDesigns
     .map((d) => `- ${d.name}: ${d.tags.join(', ')}`)
@@ -118,15 +118,22 @@ ${referenceDS ? referenceDS.slice(0, 500) : '（参照ファイルなし）'}
     ...imageContents,
   ];
 
-  const response = await client.messages.create({
+  // ストリーミングで受信（タイムアウト回避、generateProductHTML と統一）
+  let result = '';
+  const stream = await client.messages.stream({
     model: MODEL,
     max_tokens: 4096,
     messages: [{ role: 'user', content: userContentBlocks }],
     system: systemPrompt,
   });
 
-  const textBlock = response.content.find((b) => b.type === 'text');
-  return textBlock ? textBlock.text : '';
+  for await (const chunk of stream) {
+    if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+      result += chunk.delta.text;
+    }
+  }
+
+  return result;
 }
 
 export interface ProductHTMLInput {

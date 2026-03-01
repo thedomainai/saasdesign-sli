@@ -1,6 +1,8 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { join, extname } from 'path';
 
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist']);
+
 export interface ExistingDesignSystem {
   designSystemMd: string | null;
   cssVariables: string | null;
@@ -65,7 +67,7 @@ function findFile(dir: string, filename: string, maxDepth: number): string | nul
   try {
     const entries = readdirSync(dir);
     for (const entry of entries) {
-      if (entry === 'node_modules' || entry === '.git' || entry === 'dist') continue;
+      if (SKIP_DIRS.has(entry)) continue;
       const fullPath = join(dir, entry);
       const stat = statSync(fullPath);
       if (stat.isFile() && entry === filename) return fullPath;
@@ -116,7 +118,7 @@ function collectFiles(
   try {
     const entries = readdirSync(dir);
     for (const entry of entries) {
-      if (entry === 'node_modules' || entry === '.git' || entry === 'dist') continue;
+      if (SKIP_DIRS.has(entry)) continue;
       const fullPath = join(dir, entry);
       const stat = statSync(fullPath);
       if (stat.isFile() && extensions.includes(extname(entry))) {

@@ -8,7 +8,6 @@ import {
   promptFilters,
   promptDesignSelection,
   promptProjectContext,
-  confirmContinue,
 } from '../utils/prompt.js';
 import { analyzeProject } from '../utils/fs.js';
 import type { Design } from '../scraper/saaspo.js';
@@ -52,13 +51,6 @@ export async function runDesignCommand(targetDir: string): Promise<void> {
   // ─────────────────────────────────────────────
   console.log(chalk.bold('\n📂 フィルターを選択してください（スキップ可）'));
   const filterSelections = await promptFilters(filters);
-
-  const hasFilters =
-    filterSelections.pagetypes.length > 0 ||
-    filterSelections.styles.length > 0 ||
-    filterSelections.industries.length > 0 ||
-    filterSelections.assets.length > 0 ||
-    filterSelections.stacks.length > 0;
 
   // ─────────────────────────────────────────────
   // Step 3: デザイン一覧取得
@@ -133,88 +125,86 @@ export async function runDesignCommand(targetDir: string): Promise<void> {
   // ─────────────────────────────────────────────
   // Step 7: 既存デザインシステム解析
   // ─────────────────────────────────────────────
-  {
-    const spinner = ora('既存デザインシステムを解析中...').start();
-    const existingDS = analyzeProject(absoluteTarget);
-    spinner.succeed(`解析完了: ${existingDS.summary}`);
+  const dsSpinner = ora('既存デザインシステムを解析中...').start();
+  const existingDS = analyzeProject(absoluteTarget);
+  dsSpinner.succeed(`解析完了: ${existingDS.summary}`);
 
-    // ─────────────────────────────────────────────
-    // Step 8: デザインシステム再構築（Claude API）
-    // ─────────────────────────────────────────────
-    console.log('');
-    const spinner2 = ora('デザインシステムを再構築中... (Claude opus-4-6)').start();
+  // ─────────────────────────────────────────────
+  // Step 8: デザインシステム再構築（Claude API）
+  // ─────────────────────────────────────────────
+  console.log('');
+  const dsGenSpinner = ora('デザインシステムを再構築中... (Claude opus-4-6)').start();
 
-    let designSystemMd: string;
-    try {
-      designSystemMd = await generateDesignSystem({
-        screenshotPaths,
-        existingDS,
-        context: {
-          productName: projectContext.productName,
-          description: projectContext.description,
-          pageType: projectContext.pageType,
-          selectedDesigns: selectedDesigns.map((d) => ({
-            name: d.name,
-            url: d.url,
-            tags: d.tags,
-          })),
-        },
-      });
-      spinner2.succeed('デザインシステム再構築完了');
-    } catch (err) {
-      spinner2.fail('デザインシステム生成に失敗しました');
-      console.error(chalk.red(String(err)));
-      return;
-    }
-
-    // ─────────────────────────────────────────────
-    // Step 9: プロダクト実装（Claude API）
-    // ─────────────────────────────────────────────
-    const spinner3 = ora('プロダクト HTML を実装中... (Claude opus-4-6)').start();
-
-    let productHTML: string;
-    try {
-      productHTML = await generateProductHTML({
-        designSystemMd,
-        pageType: projectContext.pageType,
+  let designSystemMd: string;
+  try {
+    designSystemMd = await generateDesignSystem({
+      screenshotPaths,
+      existingDS,
+      context: {
         productName: projectContext.productName,
         description: projectContext.description,
-        screenshotPaths,
-      });
-      spinner3.succeed('プロダクト実装完了');
-    } catch (err) {
-      spinner3.fail('プロダクト実装に失敗しました');
-      console.error(chalk.red(String(err)));
-      return;
-    }
-
-    // ─────────────────────────────────────────────
-    // Step 10: ファイル書き出し
-    // ─────────────────────────────────────────────
-    if (!existsSync(absoluteTarget)) {
-      mkdirSync(absoluteTarget, { recursive: true });
-    }
-
-    const dsMdPath = join(absoluteTarget, 'design-system.md');
-    const indexHtmlPath = join(absoluteTarget, 'index.html');
-
-    writeFileSync(dsMdPath, designSystemMd, 'utf-8');
-    writeFileSync(indexHtmlPath, productHTML, 'utf-8');
-
-    // ─────────────────────────────────────────────
-    // 完了メッセージ
-    // ─────────────────────────────────────────────
-    console.log('');
-    console.log(chalk.bold.green('✅ 完了！'));
-    console.log('');
-    console.log(chalk.white('生成されたファイル:'));
-    console.log(chalk.cyan(`  📄 ${dsMdPath}`));
-    console.log(chalk.cyan(`  🌐 ${indexHtmlPath}`));
-    console.log('');
-    console.log(chalk.gray(`スクリーンショット: ${screenshotDir}`));
-    console.log('');
-    console.log(chalk.bold('ブラウザで確認:'));
-    console.log(chalk.yellow(`  open ${indexHtmlPath}`));
-    console.log('');
+        pageType: projectContext.pageType,
+        selectedDesigns: selectedDesigns.map((d) => ({
+          name: d.name,
+          url: d.url,
+          tags: d.tags,
+        })),
+      },
+    });
+    dsGenSpinner.succeed('デザインシステム再構築完了');
+  } catch (err) {
+    dsGenSpinner.fail('デザインシステム生成に失敗しました');
+    console.error(chalk.red(String(err)));
+    return;
   }
+
+  // ─────────────────────────────────────────────
+  // Step 9: プロダクト実装（Claude API）
+  // ─────────────────────────────────────────────
+  const htmlSpinner = ora('プロダクト HTML を実装中... (Claude opus-4-6)').start();
+
+  let productHTML: string;
+  try {
+    productHTML = await generateProductHTML({
+      designSystemMd,
+      pageType: projectContext.pageType,
+      productName: projectContext.productName,
+      description: projectContext.description,
+      screenshotPaths,
+    });
+    htmlSpinner.succeed('プロダクト実装完了');
+  } catch (err) {
+    htmlSpinner.fail('プロダクト実装に失敗しました');
+    console.error(chalk.red(String(err)));
+    return;
+  }
+
+  // ─────────────────────────────────────────────
+  // Step 10: ファイル書き出し
+  // ─────────────────────────────────────────────
+  if (!existsSync(absoluteTarget)) {
+    mkdirSync(absoluteTarget, { recursive: true });
+  }
+
+  const dsMdPath = join(absoluteTarget, 'design-system.md');
+  const indexHtmlPath = join(absoluteTarget, 'index.html');
+
+  writeFileSync(dsMdPath, designSystemMd, 'utf-8');
+  writeFileSync(indexHtmlPath, productHTML, 'utf-8');
+
+  // ─────────────────────────────────────────────
+  // 完了メッセージ
+  // ─────────────────────────────────────────────
+  console.log('');
+  console.log(chalk.bold.green('✅ 完了！'));
+  console.log('');
+  console.log(chalk.white('生成されたファイル:'));
+  console.log(chalk.cyan(`  📄 ${dsMdPath}`));
+  console.log(chalk.cyan(`  🌐 ${indexHtmlPath}`));
+  console.log('');
+  console.log(chalk.gray(`スクリーンショット: ${screenshotDir}`));
+  console.log('');
+  console.log(chalk.bold('ブラウザで確認:'));
+  console.log(chalk.yellow(`  open ${indexHtmlPath}`));
+  console.log('');
 }

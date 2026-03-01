@@ -1,5 +1,4 @@
 import { chromium, type Browser, type Page } from 'playwright';
-import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 export interface FilterItem {
@@ -200,8 +199,8 @@ export class SaaspoScraper {
       await page.waitForTimeout(3000);
 
       // デザインカードを取得 - 複数のセレクターを試す
-      const designs = await page.evaluate(() => {
-        const results: Design[] = [];
+      const designs = await page.evaluate((baseUrl: string) => {
+        const results: { name: string; url: string; siteUrl: string; tags: string[]; thumbnailUrl: string }[] = [];
 
         // saaspo.com のカード構造を試みる（様々なパターン）
         const cardSelectors = [
@@ -238,7 +237,7 @@ export class SaaspoScraper {
 
             results.push({
               name,
-              url: href.startsWith('http') ? href : `https://saaspo.com${href}`,
+              url: href.startsWith('http') ? href : `${baseUrl}${href}`,
               siteUrl: '',
               tags,
               thumbnailUrl: img?.src ?? '',
@@ -249,7 +248,7 @@ export class SaaspoScraper {
         }
 
         return results;
-      });
+      }, BASE_URL);
 
       await page.context().close();
       return designs as Design[];
@@ -297,15 +296,10 @@ export class SaaspoScraper {
       await page.context().close();
       return outputPath;
     } catch {
-      // フォールバック: saaspo.com のサムネイルをキャプチャ
-      try {
-        await page.screenshot({ path: outputPath });
-        await page.context().close();
-        return outputPath;
-      } catch {
-        await page.context().close();
-        return outputPath;
-      }
+      // フォールバック: 現在のページをキャプチャして続行
+      try { await page.screenshot({ path: outputPath }); } catch { /* ignore */ }
+      await page.context().close();
+      return outputPath;
     }
   }
 }

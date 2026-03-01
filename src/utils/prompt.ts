@@ -1,4 +1,4 @@
-import { checkbox, input, select, confirm } from '@inquirer/prompts';
+import { checkbox, input, select } from '@inquirer/prompts';
 import type { FilterOptions, Design } from '../scraper/saaspo.js';
 
 export interface FilterSelections {
@@ -100,6 +100,3 @@ export async function promptProjectContext(): Promise<{
   return { productName, description, pageType };
 }
 
-export async function confirmContinue(message: string): Promise<boolean> {
-  return confirm({ message, default: true });
-}
