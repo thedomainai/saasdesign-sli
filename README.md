@@ -54,3 +54,4 @@ npm run lint                    # Type check only
 | Variable | Required | Description |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | ✅ | Anthropic API key for Claude |
+| `SAASDESIGN_REFERENCE_DS` | — | Path to an existing `design-system.md` to use as structural reference |
